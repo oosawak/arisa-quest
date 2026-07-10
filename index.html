@@ -582,6 +582,92 @@
             border: none;
         }
 
+        /* ── POI fullscreen overlay ─────────────────────────────── */
+        #poi-card-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 47;
+            pointer-events: auto;
+            display: none;
+            background: rgba(0, 0, 0, 0.92);
+        }
+        #poi-card-layer.active { display: block; }
+        #poi-card {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        #poi-card.poi-card-floating {
+            inset: auto;
+            width: min(420px, calc(100vw - 18px));
+            height: min(420px, calc(100vh - 84px));
+            border: 2px solid #a855f7;
+            border-radius: 12px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 24px rgba(168, 85, 247, 0.25);
+            transform: translate(-50%, -100%);
+        }
+        #poi-card.poi-card-floating::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            bottom: -10px;
+            width: 18px;
+            height: 18px;
+            background: inherit;
+            border-right: 2px solid #a855f7;
+            border-bottom: 2px solid #a855f7;
+            transform: translateX(-50%) rotate(45deg);
+            box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        #poi-card-header {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            background: linear-gradient(90deg, rgba(51, 19, 88, 0.98), rgba(28, 10, 48, 0.98));
+            border-bottom: 1px solid rgba(192, 132, 252, 0.35);
+        }
+        #poi-card-title {
+            flex: 1;
+            min-width: 0;
+            color: #f5d0fe;
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #poi-card-close {
+            flex-shrink: 0;
+            border: 1px solid rgba(192, 132, 252, 0.45);
+            background: rgba(34, 18, 60, 0.95);
+            color: #f3e8ff;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-family: 'DotGothic16', monospace;
+            font-size: 0.72rem;
+            cursor: pointer;
+        }
+        #poi-card-close:active { background: rgba(72, 28, 124, 0.95); }
+        #poi-card-frame-wrap {
+            flex: 1;
+            min-height: 0;
+            background: #000;
+        }
+        #poi-card-frame {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: #000;
+        }
+
         /* ── 大観音バトルオーバーレイ（アリサバトルと完全分離） ──────────── */
         #daikannon-overlay {
             display: none;
@@ -1009,7 +1095,13 @@
             50%    { opacity:0.75; box-shadow:0 0 20px rgba(255,68,170,1), 0 2px 6px rgba(0,0,0,0.8); }
         }
         .enemy-marker { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
-        .enemy-sprite { image-rendering: pixelated; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.9)); }
+        .enemy-art {
+            width: 52px;
+            height: 52px;
+            object-fit: contain;
+            image-rendering: auto;
+            filter: drop-shadow(0 2px 6px rgba(0,0,0,0.9));
+        }
         .enemy-lbl {
             background: rgba(10,5,30,0.88); border: 1px solid #6633aa;
             border-radius: 3px; padding: 1px 4px;
@@ -1485,6 +1577,18 @@
             <button class="tab-btn" id="tab-territory">🏰 領地</button>
         </div>
 
+        <div id="poi-card-layer">
+            <div id="poi-card">
+                <div id="poi-card-header">
+                    <span id="poi-card-title"></span>
+                    <button id="poi-card-close">✕ とじる</button>
+                </div>
+                <div id="poi-card-frame-wrap">
+                    <iframe id="poi-card-frame" src="" title="POI Card" allow="autoplay"></iframe>
+                </div>
+            </div>
+        </div>
+
     </div><!-- #main -->
 
     <!-- ナノテラスゲームオーバーレイ（アリサクエストと完全分離・iframeで独立動作） -->
@@ -1646,17 +1750,21 @@
             };
         }
 
+        const ENEMY_ART_BASE = 'assets/EnemyImages/';
         const ENEMY_MAP = [
-            { sheet: 'enemy-sprites', sx: 256, sy: 256, sw: 256, sh: 128, maxHp: 30  }, // 0: スライム
-            { sheet: 'enemy-sprites', sx: 256, sy:  32, sw: 256, sh: 96,  maxHp: 45  }, // 1: シャドウキャット
-            { sheet: 'enemy-sprites', sx: 256, sy: 384, sw: 256, sh: 128, maxHp: 55  }, // 2: フレイムインプ
-            { sheet: 'enemy-sprites', sx: 256, sy: 768, sw: 256, sh: 128, maxHp: 40  }, // 3: ゴースト
-            { sheet: 'enemy-sprites', sx: 256, sy: 896, sw: 256, sh: 128, maxHp: 80  }, // 4: ロックゴーレム
+            { file: 'Slime1.png',      maxHp: 30  }, // 0: スライム
+            { file: 'Bat1.png',        maxHp: 45  }, // 1: シャドウキャット
+            { file: 'FireMan1.png',    maxHp: 55  }, // 2: フレイムインプ
+            { file: 'Ghost1.png',      maxHp: 40  }, // 3: ゴースト
+            { file: 'StoneGolem1.png', maxHp: 80  }, // 4: ロックゴーレム
         ];
         const ENEMY_NAMES = ['スライム','シャドウキャット','フレイムインプ','ゴースト','ロックゴーレム'];
 
         const SHEETS = {};
-        const SHEET_LIST = ['enemy-sprites', 'arisa-player-sprites', 'arisa-world-backgrounds-2', 'arisa-3d-art'];
+        const SHEET_LIST = ['arisa-player-sprites', 'arisa-world-backgrounds-2', 'arisa-3d-art'];
+        const ENEMY_ARTS = {};
+        const ENEMY_ART_LIST = ENEMY_MAP.map(e => e.file);
+        const REQUIRED_ASSET_COUNT = SHEET_LIST.length + ENEMY_ART_LIST.length;
         // マゼンタ系背景を除去するスプライト（AI生成のため色ブレあり → 四隅検出方式）
         const CHROMA_TARGETS = new Set(['arisa-player-sprites']);
         let loadedCount = 0;
@@ -1700,6 +1808,14 @@
             img.onerror = () => { console.warn('sheet load failed:', name); loadedCount++; };
             img.src = ASSET_BASE + name + '.png';
             if (!CHROMA_TARGETS.has(name)) SHEETS[name] = img;
+        }
+
+        for (const file of ENEMY_ART_LIST) {
+            const img = new Image();
+            img.onload = () => { ENEMY_ARTS[file] = img; loadedCount++; };
+            img.onerror = () => { console.warn('enemy art load failed:', file); loadedCount++; };
+            img.src = ENEMY_ART_BASE + file;
+            ENEMY_ARTS[file] = img;
         }
 
         const bgCanvas = document.getElementById('bg-canvas');
@@ -1826,7 +1942,7 @@
                 bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
                 return;
             }
-            if (loadedCount < SHEET_LIST.length) return;
+            if (loadedCount < REQUIRED_ASSET_COUNT) return;
 
             const enemyIdx    = window.wasmModule.get_enemy_idx?.()    ?? -1;
             const bgIdx       = window.wasmModule.get_bg_idx?.()       ??  0;
@@ -1910,10 +2026,14 @@
             // 敵（距離に応じた位置・サイズ）
             if (enemyIdx >= 0 && enemyIdx < ENEMY_MAP.length) {
                 const e = ENEMY_MAP[enemyIdx];
-                const destH = eneDest.w * (e.sh / e.sw); // SRC比率から高さを計算
+                const enemyImg = ENEMY_ARTS[e.file];
+                const destH = enemyImg?.naturalWidth > 0
+                    ? eneDest.w * (enemyImg.naturalHeight / enemyImg.naturalWidth)
+                    : eneDest.w;
                 if (enemyFlash <= 0 || Math.floor(enemyFlash / 4) % 2 === 0) {
-                    bgCtx.drawImage(SHEETS[e.sheet], e.sx, e.sy, e.sw, e.sh,
-                        eneDest.x, eneDest.y, eneDest.w, destH);
+                    if (enemyImg) {
+                        bgCtx.drawImage(enemyImg, eneDest.x, eneDest.y, eneDest.w, destH);
+                    }
                 }
                 // 敵HPバー（スプライト上部）—— WASM値を優先
                 const bx = eneDest.x, by = eneDest.y - 7, bw = eneDest.w, bh = 4;
@@ -1929,16 +2049,10 @@
                 bgCtx.globalAlpha = 1.0;
             }
 
-            // アリサ（左下固定）アニメーション
+            // アリサ（左下固定）静止表示
             {
-                let animKey = 'idle';
-                if (state === 1)          animKey = 'victory';
-                else if (playerFlash > 0) animKey = 'damage';
-                else if (enemyFlash > 0)  animKey = 'attack';
-                const anim   = ANIM_DEFS[animKey];
-                const col    = Math.floor(bgFrameCount / SPRITE_FPS) % anim.cols;
-                const aSrcX  = col * 128;
-                const aSrcY  = anim.row * 128;
+                const aSrcX  = 0;
+                const aSrcY  = 0;
                 const destH  = ARISA_DEST.w; // 128/128 = 1:1比率 → 60×60
                 if (playerFlash <= 0 || Math.floor(playerFlash / 4) % 2 === 0) {
                     bgCtx.drawImage(SHEETS['arisa-player-sprites'],
@@ -2188,10 +2302,90 @@
             if (onClickCallback) {
                 marker.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);
-                    onClickCallback();
+                    onClickCallback(lat, lng);
                 });
             }
         }
+
+        let poiCardState = null;
+
+        function closePoiCard() {
+            poiCardState = null;
+            document.getElementById('poi-card-layer').classList.remove('active');
+            document.getElementById('poi-card').classList.remove('poi-card-floating');
+            document.getElementById('poi-card-frame').src = '';
+        }
+
+        function repositionPoiCard() {
+            if (!poiCardState) return;
+            const layer = document.getElementById('poi-card-layer');
+            const card = document.getElementById('poi-card');
+            if (!card.classList.contains('poi-card-floating')) return;
+            const { lat, lng } = poiCardState;
+            const point = map.latLngToContainerPoint([lat, lng]);
+            const layerRect = layer.getBoundingClientRect();
+            const cardRect = card.getBoundingClientRect();
+            const mapLeft = point.x;
+            const mapTop = point.y;
+            const margin = 14;
+            const halfW = cardRect.width / 2;
+            const cardH = cardRect.height;
+
+            let left = mapLeft;
+            let top = mapTop - 18;
+
+            if (left - halfW < margin) left = halfW + margin;
+            if (left + halfW > layerRect.width - margin) left = layerRect.width - halfW - margin;
+            if (top - cardH < margin) top = cardH + margin + 18;
+            if (top > layerRect.height - margin) top = layerRect.height - margin;
+
+            card.style.left = `${left}px`;
+            card.style.top = `${top}px`;
+        }
+
+        function openPoiCard(title, url, lat, lng) {
+            poiCardState = { title, url, lat, lng };
+            const layer = document.getElementById('poi-card-layer');
+            const card = document.getElementById('poi-card');
+            const titleEl = document.getElementById('poi-card-title');
+            const frame = document.getElementById('poi-card-frame');
+            const floating = false;
+            titleEl.textContent = title;
+            card.classList.toggle('poi-card-floating', floating);
+            frame.onload = null;
+            if (title === 'MSX') {
+                frame.onload = () => {
+                    try {
+                        const doc = frame.contentDocument;
+                        if (!doc) return;
+                        let style = doc.getElementById('arisa-msx-wide-mode');
+                        if (!style) {
+                            style = doc.createElement('style');
+                            style.id = 'arisa-msx-wide-mode';
+                            style.textContent = `
+                                #msx-canvas {
+                                    width: 100vw !important;
+                                    height: 82vh !important;
+                                    max-height: 82vh !important;
+                                    max-width: none !important;
+                                }
+                            `;
+                            doc.head.appendChild(style);
+                        }
+                    } catch (e) {
+                        console.warn('MSX wide mode injection failed:', e);
+                    }
+                };
+            }
+            frame.src = url;
+            layer.classList.add('active');
+            if (floating) {
+                requestAnimationFrame(repositionPoiCard);
+            }
+        }
+
+        document.getElementById('poi-card-close').addEventListener('click', closePoiCard);
+        map.on('move zoom resize', repositionPoiCard);
 
         // ── 投稿機能 ──────────────────────────────────────────────────────────
         let posts = JSON.parse(localStorage.getItem('arisa_quest_posts') || '[]');
@@ -2400,25 +2594,9 @@
 
         function makeEnemyIcon(idx) {
             const e = ENEMY_MAP[idx];
-            const dispH = 52;
-            const scaleF = dispH / e.sh;
-            const dispW = Math.round(e.sw * scaleF);
-            const bgW = Math.round(1536 * scaleF);
-            const bgH = Math.round(1024 * scaleF);
-            const bgX = -Math.round(e.sx * scaleF) - Math.round((dispW - 52) / 2);
-            const bgY = -Math.round(e.sy * scaleF) - 30;
-            const spriteStyle = [
-                `width:52px;height:52px;border-radius:50%;overflow:hidden`,
-                `background-image:url('${ASSET_BASE}${e.sheet}.png')`,
-                `background-size:${bgW}px ${bgH}px`,
-                `background-position:${bgX}px ${bgY}px`,
-                `image-rendering:pixelated`,
-                `border:2px solid #aa44ff`,
-                `box-shadow:0 0 10px rgba(180,80,255,0.7)`,
-            ].join(';');
             return L.divIcon({
                 html: `<div class="enemy-marker">
-                    <div class="enemy-pulse" style="${spriteStyle}"></div>
+                    <img class="enemy-art enemy-pulse" src="${ENEMY_ART_BASE}${e.file}" alt="${ENEMY_NAMES[idx]}">
                     <div class="enemy-lbl">${ENEMY_NAMES[idx]}</div>
                 </div>`,
                 iconSize: [52, 68], iconAnchor: [26, 68], className: '',
@@ -2578,19 +2756,24 @@
                     arisaMarker  = L.marker([lat + 0.00005, lng], { icon: arisaIcon(true), zIndexOffset: 1000 }).addTo(map);
                     arisaMarker.on('click', onArisaTap);
                     mapFollowArisa = true;
-                    
+
                     // ユーザーGPS周辺にランドマークを動的配置
                     const landmarks = [
+                        { name: '仕事を探す', emoji: '🪪', callback: (lmLat, lmLng) => openPoiCard('仕事を探す', 'https://oosawak.github.io/jobcard', lmLat, lmLng) },
                         { name: '青葉城', emoji: '🏯', callback: startAobaCastleGame },
                         { name: '仙台大観音', emoji: '🗿', callback: startSendaiDaikannonGame },
                         { name: 'ナノテラス', emoji: '🏟️', callback: startNanoTerasGame },
+                        { name: '置賜雪合戦', emoji: '❄️', callback: (lmLat, lmLng) => openPoiCard('置賜雪合戦', 'https://oosawak.github.io/srpg/play/okitama/', lmLat, lmLng) },
+                        { name: 'Blaster3D', emoji: '💥', callback: (lmLat, lmLng) => openPoiCard('Blaster3D', 'https://oosawak.github.io/rustgames/play/blaster3d/index.html', lmLat, lmLng) },
+                        { name: 'PenPen', emoji: '🐧', callback: (lmLat, lmLng) => openPoiCard('PenPen', 'https://oosawak.github.io/rustgames/play/penpen/index.html', lmLat, lmLng) },
+                        { name: 'MSX', emoji: '💾', callback: (lmLat, lmLng) => openPoiCard('MSX', 'https://oosawak.github.io/rustgames/play/msx/index.html', lmLat, lmLng) },
                         { name: 'CubeBoy', emoji: '🥊', callback: startCubeboyGame },
                         { name: 'Lineboy', emoji: '🚂', callback: startLineboyGame },
                         { name: 'CubeBoy(Rust)', emoji: '🟣', callback: startPxCubeboyGame },
                         { name: 'Lineboy(Rust)', emoji: '🟦', callback: startPxLineboyGame },
                         { name: 'Maze 3D', emoji: '🌀', callback: startMaze3dGame },
                         { name: '観光案内 (WASM)', emoji: '🤖', callback: () => window.open('./tour-guide/', '_blank') },
-                        { name: '船の予約', emoji: '⛴', callback: () => window.open('./ship-reservation/', '_blank') }
+                        { name: '船の予約', emoji: '⛴', callback: (lmLat, lmLng) => openPoiCard('船の予約', './ship-reservation/', lmLat, lmLng) }
                     ];
                     landmarks.forEach((lm, idx) => {
                         // GPS位置から±0.008度のランダムオフセット（約900m以内）
@@ -2712,7 +2895,7 @@
                     searchRipple = null;
 
                     const trySpawn = () => {
-                        if (loadedCount >= SHEET_LIST.length) {
+                        if (loadedCount >= REQUIRED_ASSET_COUNT) {
                             addEnemies(lat, lng, needed);
                             showToast(isReplenish
                                 ? `⚠️ 敵が ${needed}体 補充された！`
@@ -2737,7 +2920,7 @@
             const overlay = document.getElementById('nt-overlay');
             const frame   = document.getElementById('nt-frame');
             // iframeのsrcをここでセット（毎回リロードされ状態クリア）
-            frame.src = '../nanoteras/index.html';
+            frame.src = 'https://oosawak.github.io/rustgames/play/animal-puzzle/index.html';
             overlay.classList.add('active');
         }
 
@@ -2752,7 +2935,7 @@
         function startAobaCastleGame() {
             const overlay = document.getElementById('aoba-overlay');
             const frame   = document.getElementById('aoba-frame');
-            frame.src = '../aobacastle/index.html';
+            frame.src = 'https://oosawak.github.io/rustgames/play/maze.html';
             overlay.classList.add('active');
         }
 
@@ -4342,7 +4525,7 @@
             const e = ENEMY_MAP[enemyInfo.eIdx];
             dbgStaticText = [
                 `[${enemyInfo.eIdx}] ${ENEMY_NAMES[enemyInfo.eIdx]}`,
-                `sx=${e.sx} sy=${e.sy} sw=${e.sw} sh=${e.sh}`,
+                `file=${e.file}`,
                 `dest x=${calcEnemyDest().x} y=${calcEnemyDest().y} w=${calcEnemyDest().w} h=${calcEnemyDest().h}`,
             ].join('\n');
             debugLog('✓ スプライト情報 OK');
